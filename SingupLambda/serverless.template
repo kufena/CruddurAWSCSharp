@@ -1,0 +1,138 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Transform": "AWS::Serverless-2016-10-31",
+  "Description": "An AWS Serverless Application.",
+  "Parameters": {
+    "ConnectionHost": {
+        "NoEcho": "False",
+        "Description": "Postgres Connection String",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "100",
+        "AllowedPattern": "[A-Za-z0-9=.-]*",
+        "ConstraintDescription": "Host and all that jazz"
+    },    
+    "ConnectionDB": {
+      "NoEcho": "False",
+      "Description": "Postgres Connection String",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "100",
+      "AllowedPattern": "[A-Za-z0-9=.-]*",
+      "ConstraintDescription": "Host and all that jazz"
+    },
+    "ConnectionUsername": {
+        "NoEcho": "False",
+        "Description": "Postgres Connection String",
+        "Type": "String",
+        "MinLength": "1",
+        "MaxLength": "100",
+        "AllowedPattern": "[A-Za-z0-9=.-]*",
+        "ConstraintDescription": "Host and all that jazz"
+    },
+    "ConnectionPassword": {
+      "NoEcho": "False",
+      "Description": "Postgres Connection String",
+      "Type": "String",
+      "MinLength": "1",
+      "MaxLength": "100",
+      "AllowedPattern": "[A-Za-z0-9=.-]*",
+      "ConstraintDescription": "Host and all that jazz"
+    }
+  },
+  "Resources": {
+    "CruddurUserPool": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [ { "Name": "verified_email", "Priority": 1 } ]
+        },
+        "Schema": [
+          {
+          "Name": "email",
+          "AttributeDataType": "String",
+          "Required": "True"
+          },
+          {
+          "Name": "name",
+          "AttributeDataType": "String",
+          "Required": "True"
+          }
+        ],
+        "MfaConfiguration": "OFF",
+        "EmailConfiguration": {
+          "EmailSendingAccount": "COGNITO_DEFAULT"
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_CODE",
+          "EmailSubject": "Verify your email address"
+        },
+        "AutoVerifiedAttributes": ["email"],
+        "UserAttributeUpdateSettings": {
+          "AttributesRequireVerificationBeforeUpdate": ["email"]
+        },
+        "UsernameAttributes": ["email"],        
+        "EmailVerificationSubject": "Verify your email address"
+      }
+    },
+    "CruddurUserPoolClient": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Properties": {
+        "UserPoolId": {"Ref": "CruddurUserPool" },
+        "ExplicitAuthFlows": ["ALLOW_USER_SRP_AUTH","ALLOW_CUSTOM_AUTH","ALLOW_REFRESH_TOKEN_AUTH"],
+        "GenerateSecret": "False",
+
+      }
+    },
+    "Deploy": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "SignupLambda::SignupLambda.Functions::FunctionHandler",
+        "Runtime": "dotnet6",
+        "CodeUri": "",
+        "MemorySize": 256,
+        "Role": null,
+        "Policies": [
+          "AWSLambdaBasicExecutionRole",
+          "AmazonRDSFullAccess",
+          "AmazonSSMFullAccess"
+        ],
+        "Environment": {
+          "Variables": {
+            "ConnectionHost": {"Ref": "ConnectionHost"},
+            "ConnectionDB": {"Ref": "ConnectionDB"},
+            "ConnectionUsername": {"Ref": "ConnectionUsername"},
+            "ConnectionPassword": {"Ref": "ConnectionPassword"},
+          }
+        },
+        "VpcConfig": {
+          "SubnetIds": ["subnet-de83deb7","subnet-54ab322e","subnet-5815b914"],
+          "SecurityGroupIds": ["sg-1f52447b"]
+        },
+        "Timeout": 30,
+        "Events": {
+          "PostSignUp": {
+              "Type": "Cognito",
+              "Properties": {
+                 "Trigger": "PostConfirmation",
+                 "UserPool": {"Ref": "CruddurUserPool"}
+              }
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "UserPool": {
+      "Description": "UserPoolId",
+      "Value": {"Ref": "CruddurUserPool"}
+    },
+    "UserPoolClient": {
+      "Description": "UserPoolClientId",
+      "Value": {"Ref": "CruddurUserPoolClient"}
+    }
+  }
+}
