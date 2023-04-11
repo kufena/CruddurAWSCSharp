@@ -10,6 +10,8 @@ using Amazon;
 using Microsoft.AspNetCore.DataProtection;
 using IdentityModel.Client;
 using Microsoft.Extensions.Options;
+using Amazon.CognitoIdentityProvider;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,21 +31,47 @@ string aws_environment = $"/{environment}/cruddur/";
 builder.Configuration.AddSystemsManager(aws_environment, 
     new Amazon.Extensions.NETCore.Setup.AWSOptions { Region = RegionEndpoint.EUWest2 });
 
-// Authority for authentication of tokens.  AWS Cognito I hope.
-builder.Services.AddAuthentication(options => { })
-    .AddJwtBearer(authenticationScheme: "token", configureOptions: options => 
-    {
-        options.Authority = "https://login.aws.com/";
-        options.Audience = "api";
-        options.MapInboundClaims = false;
-    });
-    builder.Services.AddAuthorization(options =>
-    {
-        options.AddPolicy(name: "ApiCaller", configurePolicy: policy =>
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
         {
-            policy.RequireClaim("scope", new string[] { "api" });
+            options.Audience = "api";
+            options.Authority = "https://cognito-idp.your-region.amazonaws.com/your-user-pool-id";
+            options.RequireHttpsMetadata = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = "https://cognito-idp.your-region.amazonaws.com/your-user-pool-id",
+                ValidAudience = "your-audience",
+                IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+                {
+                    var provider = new AmazonCognitoIdentityProviderClient()
+                    {
+                        Config = new AmazonServiceClient(
+                    };
+                    var result = provider.GetSigningKeyAsync(identifier).GetAwaiter().GetResult();
+                    return new[] { result.Key };
+                }
+            };
         });
-    });
+
+// Authority for authentication of tokens.  AWS Cognito I hope.
+//builder.Services.AddAuthentication(options => { })
+//    .AddJwtBearer(authenticationScheme: "token", configureOptions: options => 
+//    {
+//        options.Authority = "https://login.aws.com/";
+//        options.Audience = "api";
+//        options.MapInboundClaims = false;
+//    });
+//    builder.Services.AddAuthorization(options =>
+//    {
+//        options.AddPolicy(name: "ApiCaller", configurePolicy: policy =>
+//        {
+//            policy.RequireClaim("scope", new string[] { "api" });
+//        });
+//    });
 
 //.AddOpenIdConnect("oidc", options => 
 //{
