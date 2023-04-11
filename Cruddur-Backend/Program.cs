@@ -23,14 +23,13 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Use AWS Systems Manager Parameter Store for values required, rather than appsettings.json.
-string? environment = builder.Environment.ToString();
-if (environment == null)
-    environment = "/cruddur/";
-else 
-    environment = $"/{environment.ToLower()}/cruddur/";
+//builder.Configuration.GetValue<string>("Environment");
+string environment = builder.Environment.EnvironmentName.ToLower();
+string aws_environment = $"/{environment}/cruddur/";
+builder.Configuration.AddSystemsManager(aws_environment, 
+    new Amazon.Extensions.NETCore.Setup.AWSOptions { Region = RegionEndpoint.EUWest2 });
 
-builder.Configuration.AddSystemsManager($"{environment}", new Amazon.Extensions.NETCore.Setup.AWSOptions { Region = RegionEndpoint.EUWest2 });
-
+// Authority for authentication of tokens.  AWS Cognito I hope.
 builder.Services.AddAuthentication(options => { })
     .AddJwtBearer(authenticationScheme: "token", configureOptions: options => 
     {
