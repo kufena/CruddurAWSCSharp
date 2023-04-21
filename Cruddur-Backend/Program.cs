@@ -15,7 +15,18 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var _user_pool_id = System.Environment.GetEnvironmentVariable("AWS_COGNITO_USER_POOL_ID");
+var _client_id = System.Environment.GetEnvironmentVariable("AWS_COGNITO_USER_POOL_CLIENT_ID");
+var _default_region = System.Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION");
+
+if (_user_pool_id == null || _client_id == null || _default_region == null)
+{
+    Console.WriteLine($"Lack of Environment variables: UserPoolId = {_user_pool_id}, ClientId = {_client_id}, DefaultRegion = {_default_region}");
+    throw new Exception("Null values for one of the essential three environment variables.");
+}
+
 Console.Out.WriteLine("Hello There!");
+Console.Out.WriteLine($"UserPoolId = {_user_pool_id}, ClientId = {_client_id}, DefaultRegion = {_default_region}");
 
 // Add services to the container.
 
@@ -28,14 +39,16 @@ builder.Services.AddSwaggerGen();
 //builder.Configuration.GetValue<string>("Environment");
 string environment = builder.Environment.EnvironmentName.ToLower();
 string aws_environment = $"/{environment}/cruddur/";
+
+string cognito_authority = $"https://cognito-idp.{_default_region}.amazonaws.com/{_user_pool_id}";
 builder.Configuration.AddSystemsManager(aws_environment, 
     new Amazon.Extensions.NETCore.Setup.AWSOptions { Region = RegionEndpoint.EUWest2 });
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
-            options.Audience = "api";
-            options.Authority = "https://cognito-idp.your-region.amazonaws.com/your-user-pool-id";
+            options.Audience = _client_id; // this is the client id.
+            options.Authority = cognito_authority;
             options.RequireHttpsMetadata = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -43,17 +56,20 @@ builder.Configuration.AddSystemsManager(aws_environment,
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = "https://cognito-idp.your-region.amazonaws.com/your-user-pool-id",
-                ValidAudience = "your-audience",
-                IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
-                {
-                    var provider = new AmazonCognitoIdentityProviderClient()
-                    {
-                        Config = new AmazonServiceClient(
-                    };
-                    var result = provider.GetSigningKeyAsync(identifier).GetAwaiter().GetResult();
-                    return new[] { result.Key };
-                }
+                ValidIssuer = cognito_authority,
+                ValidAudience = _client_id,
+                //IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+                //{
+                //    var provider = new AmazonCognitoIdentityProviderClient()
+                //    {
+                //        Config = new ClientOptions()
+                //        {
+                //             ClientId = ""
+                //        }
+                //    };
+                //    var result = provider.GetSigningKeyAsync(identifier).GetAwaiter().GetResult();
+                //    return new[] { result.Key };
+                //}
             };
         });
 
@@ -90,6 +106,17 @@ builder.Configuration.AddSystemsManager(aws_environment,
 builder.Services.AddScoped<UserDbContext>(x => { return new UserDbContext(""); });
 builder.Services.AddScoped<ActivitiesDbContext>(x => { return new ActivitiesDbContext(""); });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MyAllowedOrigins",
+        policy =>
+        {
+            policy.WithOrigins("*") // note the port is included 
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -105,8 +132,9 @@ var connection_string = configuration.GetValue<string>($"postgres_connection_str
 //string connection_string = app.Configuration.GetValue<string>("postgres_connection_string");
 Console.Out.WriteLine($"Postgres connection string = {connection_string}");
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
+app.UseCors("MyAllowedOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
 
