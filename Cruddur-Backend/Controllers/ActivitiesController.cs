@@ -4,6 +4,7 @@ using CruddurSQL;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using System.Runtime.CompilerServices;
+using Cruddur_Backend.Models;
 
 namespace Cruddur_Backend.Controllers
 {
@@ -21,21 +22,34 @@ namespace Cruddur_Backend.Controllers
 
         [Authorize]
         [HttpGet("home")]
-        public IEnumerable<ActivitiesModel> Get()
+        public IEnumerable<Activities> Get()
         {
-            ActivitiesModel model1 = new ActivitiesModel()
+            if (User != null)
             {
+                logger.LogInformation($"Current user is {User}");
+                foreach (var c in User.Claims)
+                {
+                    logger.LogInformation($"Claim {c}");
+                }
+            }
+            else
+            {
+                logger.LogInformation("User is NULL!!! What a bore.");
+            }
+
+            Activities model1 = new Activities()
+            {
+                uuid = Guid.NewGuid(),
                 created_at = DateTime.Now,
                 expires_at = DateTime.Now + TimeSpan.FromDays(10),
-                user_uuid = Guid.NewGuid(),
-                uuid = Guid.NewGuid(),
+                handle = "Andy Douglas",
                 likes_count = 4,
                 replies_count = 0,
-                reply_to_activity_uuid = 0,
                 reposts_count = 0,
-                text = "Hello this is activity model 1"
+                message = "Hello this is activity model 1",
+                replies = new List<Replies>()
             };
-            return new List<ActivitiesModel> { model1 };
+            return new List<Activities> { model1 };
         }
     }
 }

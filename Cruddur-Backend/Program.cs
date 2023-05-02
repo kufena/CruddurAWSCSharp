@@ -12,6 +12,8 @@ using IdentityModel.Client;
 using Microsoft.Extensions.Options;
 using Amazon.CognitoIdentityProvider;
 using Microsoft.IdentityModel.Tokens;
+using System.Net;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,34 +46,59 @@ string cognito_authority = $"https://cognito-idp.{_default_region}.amazonaws.com
 builder.Configuration.AddSystemsManager(aws_environment, 
     new Amazon.Extensions.NETCore.Setup.AWSOptions { Region = RegionEndpoint.EUWest2 });
 
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Audience = _client_id; // this is the client id.
+        options.Authority = cognito_authority;
+        options.RequireHttpsMetadata = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            options.Audience = _client_id; // this is the client id.
-            options.Authority = cognito_authority;
-            options.RequireHttpsMetadata = true;
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = cognito_authority,
-                ValidAudience = _client_id,
-                //IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
-                //{
-                //    var provider = new AmazonCognitoIdentityProviderClient()
-                //    {
-                //        Config = new ClientOptions()
-                //        {
-                //             ClientId = ""
-                //        }
-                //    };
-                //    var result = provider.GetSigningKeyAsync(identifier).GetAwaiter().GetResult();
-                //    return new[] { result.Key };
-                //}
-            };
-        });
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidateActor = true,
+            ValidIssuer = cognito_authority,
+            ValidAudience = _client_id,
+            
+            //IssuerSigningKeyResolver = (s, securityToken, identifier, parameters) =>
+            //{
+            //    Console.WriteLine("Getting keys??????????????????????????????????????????????????????????????????");
+            //    // get JsonWebKeySet from AWS 
+            //    try
+            //    {
+            //        HttpClient _client = new HttpClient();
+            //        var keys_task = _client.GetAsync($"{cognito_authority}/.well-known/jwks.json");
+            //        keys_task.Wait();
+            //        var response = keys_task.Result;
+            //        Console.WriteLine(response.StatusCode.ToString());
+            //        var content_fetch = response.Content.ReadAsStringAsync();
+            //        content_fetch.Wait();
+            //        var content = content_fetch.Result;
+
+            //        Console.WriteLine(content);
+
+            //        Console.WriteLine("Got keys?????????!!!!!!!!!!!!!!!!!!!!!???????????????????????????!!!!!!!!!!!!!!");
+            //        // serialize the result 
+            //        var keys = JsonSerializer.Deserialize<JsonWebKeySet>(content).Keys;
+
+            //        if (keys != null)
+            //            foreach (var k in keys) Console.WriteLine(k);
+            //        else
+            //            Console.WriteLine("keys is null init!!!!!$$$$$$$$$$$$$%%%%%%%%%%%%%%%%%^^^^^^^^^^^^£££££££********");
+
+            //        // cast the result to be the type expected by IssuerSigningKeyResolver 
+            //        return keys; // (IEnumerable<SecurityKey>)keys;
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        Console.WriteLine(ex.Message);
+            //        throw ex;
+            //    }
+            //}
+        };
+    });
 
 // Authority for authentication of tokens.  AWS Cognito I hope.
 //builder.Services.AddAuthentication(options => { })
@@ -89,19 +116,6 @@ builder.Configuration.AddSystemsManager(aws_environment,
 //        });
 //    });
 
-//.AddOpenIdConnect("oidc", options => 
-//{
-//    options.Authority = "https://awsblahbalhbalh";
-//    // confidential client using code flow + PKCE
-//    options.ClientId = "";
-//    options.ClientSecret = "";
-//    options.ResponseType = "code";
-//    options.ResponseMode = "query";
-//    // store tokens in session
-//    options.SaveTokens = true;
-//    options.Scope.Add("api");
-//    options.Scope.Add("offline_access");
-//});
 
 builder.Services.AddScoped<UserDbContext>(x => { return new UserDbContext(""); });
 builder.Services.AddScoped<ActivitiesDbContext>(x => { return new ActivitiesDbContext(""); });
